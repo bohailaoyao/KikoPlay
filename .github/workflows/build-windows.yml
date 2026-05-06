@@ -1,0 +1,70 @@
+name: Build KikoPlay Windows
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3' # 建议与 Linux 版保持一致
+          arch: 'win64_msvc2022_64'
+          host: 'windows'
+          target: 'desktop'
+          modules: 'qtpositioning qtwebchannel qtwebengine qtwebsockets'
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Create secrets header (Optional)
+        shell: pwsh
+        run: |
+          if (!(Test-Path Common)) { New-Item -ItemType Directory -Path Common }
+          $content = @"
+          #undef APP_ID_KIKO
+          #undef APP_SECRET_KIKO
+          #undef APP_ID_DANDAN
+          #undef APP_SECRET_DANDAN
+          #define APP_ID_KIKO ""
+          #define APP_SECRET_KIKO ""
+          #define APP_ID_DANDAN ""
+          #define APP_SECRET_DANDAN ""
+          "@
+          Set-Content -Path Common/secrets.h -Value $content
+
+      - name: Build
+        shell: cmd
+        run: |
+          qmake build.pro
+          nmake
+
+      - name: Deploy and Package
+        shell: pwsh
+        run: |
+          mkdir publish
+          # 假设编译生成在 release 目录，请根据实际 build.pro 的生成路径调整
+          if (Test-Path release/KikoPlay.exe) {
+              copy release/KikoPlay.exe publish/
+          } elseif (Test-Path KikoPlay.exe) {
+              copy KikoPlay.exe publish/
+          }
+          
+          # 运行部署工具，自动抓取需要的 DLL
+          windeployqt publish/KikoPlay.exe --no-translations --compiler-runtime --qmldir .
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: KikoPlay-Windows-x64
+          path: publish/
