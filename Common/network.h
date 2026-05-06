@@ -16,7 +16,7 @@
 
 namespace Network
 {
-    static constexpr const int timeout = 10000;
+    static constexpr const int timeout = 120000;
     static constexpr const int maxRedirectTimes = 10;
     struct Reply
     {
